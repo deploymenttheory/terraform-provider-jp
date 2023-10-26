@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/hashicorp/terraform-provider-scaffolding-framework/internal/client"
+	"github.com/deploymenttheory/terraform-provider-jp/internal/client"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
