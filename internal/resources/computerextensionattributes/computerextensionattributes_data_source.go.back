@@ -1,0 +1,166 @@
+// computerextensionattributes_data_source.go
+package computerextensionattributes
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/deploymenttheory/go-api-sdk-jamfpro/sdk/jamfpro"
+	"github.com/deploymenttheory/terraform-provider-jp/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+// Ensure provider defined types fully satisfy framework interfaces.
+var _ datasource.DataSource = &ComputerExtensionAttributesDataSource{}
+
+func NewComputerExtensionAttributesDataSource() datasource.DataSource {
+	return &ComputerExtensionAttributesDataSource{}
+}
+
+// ComputerExtensionAttributesDataSource defines the data source implementation.
+type ComputerExtensionAttributesDataSource struct {
+	client *client.APIClient
+}
+
+// ComputerExtensionAttributesDataSourceModel describes the data source data model.
+type ComputerExtensionAttributesDataSourceModel struct {
+	ID               types.Int64  `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	Enabled          types.Bool   `tfsdk:"enabled"`
+	Description      types.String `tfsdk:"description"`
+	DataType         types.String `tfsdk:"data_type"`
+	InputType        types.List   `tfsdk:"input_type"`
+	InventoryDisplay types.String `tfsdk:"inventory_display"`
+	ReconDisplay     types.String `tfsdk:"recon_display"`
+}
+
+// Metadata sets the metadata for the data source.
+func (d *ComputerExtensionAttributesDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_computer_extension_attributes"
+}
+
+// Schema defines the schema for the data source.
+func (d *ComputerExtensionAttributesDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Provides information about a specific computer extension attribute by its ID or Name.",
+
+		Attributes: map[string]schema.Attribute{
+			"id": schema.Int64Attribute{
+				MarkdownDescription: "The unique identifier of the computer extension attribute.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"name": schema.StringAttribute{
+				MarkdownDescription: "The unique name of the Jamf Pro computer extension attribute.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"enabled": schema.BoolAttribute{
+				MarkdownDescription: "Indicates if the computer extension attribute is enabled.",
+				Computed:            true,
+			},
+			"description": schema.StringAttribute{
+				MarkdownDescription: "Description of the computer extension attribute.",
+				Computed:            true,
+			},
+			"data_type": schema.StringAttribute{
+				MarkdownDescription: "Data type of the computer extension attribute.",
+				Computed:            true,
+			},
+			"input_type": schema.ListNestedAttributes(map[string]schema.Attribute{
+				"type": schema.StringAttribute{
+					MarkdownDescription: "Type of the input for the computer extension attribute.",
+					Computed:            true,
+				},
+				"platform": schema.StringAttribute{
+					MarkdownDescription: "Platform type for the computer extension attribute.",
+					Computed:            true,
+				},
+				"script": schema.StringAttribute{
+					MarkdownDescription: "Script associated with the computer extension attribute.",
+					Computed:            true,
+				},
+				"choices": schema.ListNestedAttributes(map[string]schema.Attribute{
+					"choice": schema.StringAttribute{
+						MarkdownDescription: "Choices associated with the computer extension attribute if it is a pop-up menu type.",
+						Computed:            true,
+					},
+				}, schema.ListNestedAttributesOptions{}),
+			}, schema.ListNestedAttributesOptions{}),
+			"inventory_display": schema.StringAttribute{
+				MarkdownDescription: "Display details for inventory for the computer extension attribute.",
+				Computed:            true,
+			},
+			"recon_display": schema.StringAttribute{
+				MarkdownDescription: "Display details for recon for the computer extension attribute.",
+				Computed:            true,
+			},
+		},
+	}
+}
+
+func (d *ComputerExtensionAttributesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*client.APIClient)
+
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *client.APIClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+
+		return
+	}
+
+	d.client = client
+}
+
+func (d *ComputerExtensionAttributesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data ComputerExtensionAttributesDataSourceModel
+
+	// Read Terraform configuration data into the model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Logic to fetch data from Jamf Pro
+	var attribute *jamfpro.ComputerExtensionAttributeResponse
+	var err error
+
+	if !data.Name.Null && !data.Name.Unknown {
+		attribute, err = d.client.Conn.GetComputerExtensionAttributeByName(data.Name.Value)
+	} else if !data.ID.Null && !data.ID.Unknown {
+		attribute, err = d.client.Conn.GetComputerExtensionAttributeByID(data.ID.Value)
+	} else {
+		resp.Diagnostics.AddError("Missing Identifier", "Either 'name' or 'id' must be provided")
+		return
+	}
+
+	if err != nil {
+		resp.Diagnostics.AddError("API Client Error", fmt.Sprintf("Failed to fetch computer extension attribute: %s", err))
+		return
+	}
+
+	// Set the data in the model
+	data.ID = types.Int{Value: attribute.ID}
+	data.Name = types.String{Value: attribute.Name}
+	data.Enabled = types.Bool{Value: attribute.Enabled}
+	data.Description = types.String{Value: attribute.Description}
+	data.DataType = types.String{Value: attribute.DataType}
+	// ... Set other attributes in the model
+
+	// Write logs using the tflog package
+	tflog.Trace(ctx, "read a data source")
+
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}

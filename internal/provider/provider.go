@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/deploymenttheory/terraform-provider-jp/internal/client"
+	"github.com/deploymenttheory/terraform-provider-jp/internal/resources/computerextensionattributes"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -225,5 +226,9 @@ func (p *jamfproProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 // Resources defines the resources implemented in the provider.
 func (p *jamfproProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		func() resource.Resource {
+			return &computerextensionattributes.ResourceJamfProComputerExtensionAttributes{}
+		},
+	}
 }
